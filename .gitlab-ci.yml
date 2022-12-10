@@ -1,0 +1,159 @@
+stages:
+  - build
+  - test
+  - push-registry
+  - deploy
+  
+
+cache:
+  paths:
+    - .m2/repository
+
+backend1-build:
+  stage: build
+  before_script:
+    - cd StudentManagementAPI_1
+  script:
+    - mvn package -DskipTests
+    - echo Done build package
+    - echo "Start build docker image"
+    - docker build -t aws2022/backend1:latest .
+    - echo "Done build backend"
+  only:
+    - main
+
+backend2-build:
+  stage: build
+  before_script:
+    - cd StudentManagementAPI_2
+  script:
+    - mvn package -DskipTests
+    - echo Done build package
+    - echo "Start build docker image"
+    - docker build -t aws2022/backend2:latest .
+    - echo "Done build backend"
+  only:
+    - main
+
+webui-build:
+  stage: build
+  before_script:
+    - cd StudentManagementUI
+  script:
+    - echo "Start build docker image"
+    - docker build -t aws2022/webui:latest .
+    - cd ..
+    - echo "Done build UI"
+  only:
+    - main
+
+webui-push:
+  stage: push-registry
+  script:
+    - echo "Login docker"
+    - docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD
+    - docker tag aws2022/webui:latest $GITLAB_REGISTRY/aws2022/webui:latest
+    - docker push $GITLAB_REGISTRY/aws2022/webui:latest
+    - echo "Push done"
+  only:
+    - main
+
+backend1-push:
+  stage: push-registry
+  script:
+    - echo "Login docker"
+    - docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD
+    - docker tag aws2022/backend1:latest $GITLAB_REGISTRY/aws2022/backend1:latest
+    - docker push $GITLAB_REGISTRY/aws2022/backend1:latest
+    - echo "Push done"
+  only:
+    - main
+
+backend2-push:
+  stage: push-registry
+  script:
+    - echo "Login docker"
+    - docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD
+    - docker tag aws2022/backend2:latest $GITLAB_REGISTRY/aws2022/backend2:latest
+    - docker push $GITLAB_REGISTRY/aws2022/backend2:latest
+    - echo "Push done"
+  only:
+    - main
+
+deploy-backend1:
+  stage: deploy
+  before_script:
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - echo "$SSH_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - touch ~/.ssh/config
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - ssh-keyscan -H $IP_BACKEND_1 >> ~/.ssh/known_hosts
+  script:
+    - ssh ubuntu@$IP_BACKEND_1 "docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD"
+    - ssh ubuntu@$IP_BACKEND_1 "docker stop backend1 || true"
+    - ssh ubuntu@$IP_BACKEND_1 "docker container prune -f"
+    - ssh ubuntu@$IP_BACKEND_1 "docker image prune -f"
+    - ssh ubuntu@$IP_BACKEND_1 "docker pull $GITLAB_REGISTRY/aws2022/backend1:latest"
+    - ssh ubuntu@$IP_BACKEND_1 "docker run --restart=always -d -p 8080:8080 --name backend1 $GITLAB_REGISTRY/aws2022/backend1:latest"
+  only:
+    - main
+
+deploy-backend2:
+  stage: deploy
+  before_script:
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - echo "$SSH_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - touch ~/.ssh/config
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - ssh-keyscan -H $IP_BACKEND_2 >> ~/.ssh/known_hosts
+  script:
+    - ssh ubuntu@$IP_BACKEND_2 "docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD"
+    - ssh ubuntu@$IP_BACKEND_2 "docker stop backend2 || true"
+    - ssh ubuntu@$IP_BACKEND_2 "docker container prune -f"
+    - ssh ubuntu@$IP_BACKEND_2 "docker image prune -f"
+    - ssh ubuntu@$IP_BACKEND_2 "docker pull $GITLAB_REGISTRY/aws2022/backend2:latest"
+    - ssh ubuntu@$IP_BACKEND_2 "docker run --restart=always -d -p 8080:8080 --name backend2 $GITLAB_REGISTRY/aws2022/backend2:latest"
+  only:
+    - main
+
+deploy-webui:
+  stage: deploy
+  before_script:
+    - mkdir -p ~/.ssh
+    - eval $(ssh-agent -s)
+    - echo "$SSH_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - touch ~/.ssh/config
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - ssh-keyscan -H $IP_UI >> ~/.ssh/known_hosts
+  script:
+    - ssh ubuntu@$IP_UI "docker login $GITLAB_REGISTRY --username $GITLAB_USER --password $GITLAB_PASSWORD"
+    - ssh ubuntu@$IP_UI "docker stop webui || true"
+    - ssh ubuntu@$IP_UI "docker container prune -f"
+    - ssh ubuntu@$IP_UI "docker image prune -f"
+    - ssh ubuntu@$IP_UI "docker pull $GITLAB_REGISTRY/aws2022/webui:latest"
+    - ssh ubuntu@$IP_UI "docker run --restart=always -d -p 5000:80 --name webui $GITLAB_REGISTRY/aws2022/webui:latest"
+  only:
+    - main
+deploy_staging:
+  stage: deploy
+  script:
+    - echo "Deploy to staging server"
+  environment:
+    name: ui
+    url: http://ec2-34-224-171-19.compute-1.amazonaws.com:5000/
+
+# test-code-job1:
+#   stage: test
+#   script:
+#     - echo "If the files are built successfully, test some files with one command:"
+test_job:
+  stage: test
+  before_script:
+    - cd StudentManagementAPI_1
+  script: 
+    - echo "Maven test start"
+    - "mvn test"
+
+

@@ -1,0 +1,166 @@
+@model StudentManagement.Models.Student
+
+@{
+    ViewData["Title"] = "AddStudent";
+}
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width" />
+</head>
+
+<body>
+
+    <h4>Add Student</h4>
+    <hr />
+    <h1 class="text-center" style="margin:40px">Student Information</h1>
+    <form asp-controller="Student" ;>
+
+        <div class="form-group">
+            <label asp-for="@Model.fullname">FullName</label>
+            <input asp-for="@Model.fullname" type="text" class="form-control" id="fullname">
+            <span asp-validation-for="@Model.fullname" class="text-danger" id="errfullname"></span>
+
+        </div>
+
+        <div class="form-group">
+            <label asp-for="@Model.classname">Class</label>
+            <input asp-for="@Model.classname" type="text" class="form-control" id="classz">
+            <span asp-validation-for="@Model.classname" class="text-danger" id="errclassz"></span>
+        </div>
+        <div class="form-group">
+            <label asp-for="@Model.sex">Gender</label><br />
+            <select asp-for="@Model.sex" name="sex" id="sex" runat="server">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label asp-for="@Model.gpa">GPA</label>
+            <input asp-for="@Model.gpa" type="number" class="form-control" id="gpa" />
+            <span asp-validation-for="@Model.gpa" class="text-danger" id="errgpa"></span>
+        </div>
+
+        <div class="buttons">
+            <div class="upload-button">
+                <div class="label">Click me!</div>
+                <input id="files" name="files" type="file" size="1" />
+                <br />
+                <span id="errfile" class="text-danger"></span>
+            </div>
+        </div>
+        <br />
+
+        <button type="reset" class="btn btn-light">Reset</button>
+        @*asp-action="AddNewStudent onclick="uploadFiles('files')" <form id="form" name="form" action="/uploader"
+            enctype="multipart/form-data" method="post"> </form>"*@
+        <button type="button" runat="server" class="btn btn-primary" onclick="uploadFiles('files')">Confirm </button>
+        <script>
+
+            function validation(student, file) {
+                var result1 = true, result2 = true, result3 = true, result4 = true;
+
+                if (!student.fullname || student.fullname.trim().length < 1) {
+                    $('#errfullname').text('This field cannot be empty')
+                    result1 = false;
+                }
+                if (!student.classname || student.classname.trim().length < 1) {
+
+                    $('#errclassz').text('This field cannot be empty')
+                    result2 = false;
+                }
+
+                if (!student.gpa || student.gpa > 4 || student.gpa < 0) {
+                    $('#errgpa').text('GPA must be between 0 and 4!')
+                    console.log("GPA:", student.gpa)
+                    result3 = false;
+                }
+                if (!file) {
+                    $('#errfile').text('This field cannot be empty')
+                    result4 = false;
+                }
+                return result1 && result2 && result3 && result4;
+
+            }
+
+            function uploadFiles(inputId) {
+
+                var result = confirm("Do you want to continue?");
+
+                if (!result) {
+                    return;
+                }
+
+                var formData = new FormData();
+                var input = document.getElementById(inputId);
+                var fullname = $('#fullname').val()
+                var classz = $('#classz').val()
+                var gpa = $('#gpa').val()
+                var sex = $('#sex').val()
+
+
+                var files = input.files;
+                var student = {
+                    "fullname": fullname,
+                    "classname": classz,
+                    "sex": sex,
+                    "gpa": parseFloat(gpa)
+                }
+                console.log("GPA", student.gpa)
+                console.log("FILE:", files[0])
+
+                var isValid = validation(student, files[0])
+                if (!isValid) {
+                    return;
+                }
+
+
+
+                formData.append('student', new Blob([JSON.stringify(student)], { type: "application/json" }));
+                formData.append('file', files[0]);
+
+                console.log("STUDENT", student)
+                $.ajax({
+                    type: "POST",
+
+                    url: 'http://ec2-52-87-54-46.compute-1.amazonaws.com:8080/student/add',
+
+                    data: formData,
+                    dataType: "json",
+                    processData: false,
+                    contentType: false,
+
+                    error: function (result) {
+                        alert("error");
+                        console.log(result);
+                    },
+                    success: function (result) {
+
+                        console.log("Host:", window.location.host)
+                        window.location.href = window.location.protocol + "//" + window.location.host + "/Student"
+
+                    }
+                });
+            }
+
+
+        </script>
+
+
+    </form>
+
+
+    <div>
+        <a asp-action="Index">Back to List</a>
+    </div>
+
+    @section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    }
+</body>
+
+</html>
